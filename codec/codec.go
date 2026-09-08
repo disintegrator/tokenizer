@@ -20,6 +20,8 @@ func (c *Codec) GetName() string {
 }
 
 // Count returns the number of tokens in the input string.
+// Count and Encode are safe to call concurrently from multiple goroutines
+// on the same Codec.
 func (c *Codec) Count(input string) (int, error) {
 	var count int
 
@@ -31,6 +33,8 @@ func (c *Codec) Count(input string) (int, error) {
 }
 
 // Encode returns the token IDs and tokens for the input string.
+// Encode and Count are safe to call concurrently from multiple goroutines
+// on the same Codec.
 func (c *Codec) Encode(input string) ([]uint, []string, error) {
 
 	var ids []uint

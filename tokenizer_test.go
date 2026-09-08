@@ -1,6 +1,8 @@
 package tokenizer_test
 
 import (
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/tiktoken-go/tokenizer"
@@ -79,6 +81,77 @@ func TestP50kBase(t *testing.T) {
 	}
 
 	runTests(t, tok, tests)
+}
+
+func TestConcurrentCountAndEncode(t *testing.T) {
+	inputs := []string{
+		"",
+		"hello world",
+		"supercalifragilistic",
+		"We're testing 123456789!\n  Multiple\tspaces.\r\n",
+		"こんにちは世界 — café",
+	}
+
+	for _, encoding := range []tokenizer.Encoding{
+		tokenizer.O200kBase,
+		tokenizer.Cl100kBase,
+		tokenizer.R50kBase,
+		tokenizer.P50kBase,
+		tokenizer.P50kEdit,
+	} {
+		t.Run(string(encoding), func(t *testing.T) {
+			reference, err := tokenizer.Get(encoding)
+			if err != nil {
+				t.Fatalf("can't create reference tokenizer: %v", err)
+			}
+			wantIDs := make([][]uint, len(inputs))
+			wantTokens := make([][]string, len(inputs))
+			for i, input := range inputs {
+				wantIDs[i], wantTokens[i], err = reference.Encode(input)
+				if err != nil {
+					t.Fatalf("error encoding reference %q: %v", input, err)
+				}
+			}
+
+			// Keep the shared instance unused until the parallel calls begin,
+			// so lazy initialization is also exercised by the race detector.
+			shared, err := tokenizer.Get(encoding)
+			if err != nil {
+				t.Fatalf("can't create shared tokenizer: %v", err)
+			}
+			for worker := range 16 {
+				t.Run(fmt.Sprintf("worker-%d", worker), func(t *testing.T) {
+					t.Parallel()
+					for iteration := range 10 {
+						for offset := range inputs {
+							i := (worker + iteration + offset) % len(inputs)
+							input := inputs[i]
+							if worker%2 == 0 {
+								count, err := shared.Count(input)
+								if err != nil {
+									t.Fatalf("error counting %q: %v", input, err)
+								}
+								if count != len(wantIDs[i]) {
+									t.Fatalf("count for %q: want %d, got %d", input, len(wantIDs[i]), count)
+								}
+							} else {
+								ids, tokens, err := shared.Encode(input)
+								if err != nil {
+									t.Fatalf("error encoding %q: %v", input, err)
+								}
+								if !slices.Equal(ids, wantIDs[i]) {
+									t.Fatalf("IDs for %q: want %v, got %v", input, wantIDs[i], ids)
+								}
+								if !slices.Equal(tokens, wantTokens[i]) {
+									t.Fatalf("tokens for %q: want %q, got %q", input, wantTokens[i], tokens)
+								}
+							}
+						}
+					}
+				})
+			}
+		})
+	}
 }
 
 func runTests(t *testing.T, tok tokenizer.Codec, tests []testCase) {
