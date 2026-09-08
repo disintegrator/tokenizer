@@ -98,15 +98,18 @@ type Codec interface {
 	GetName() string
 
 	// Count returns the number of tokens in the input string.
-	// For codecs returned by this package, Count and Encode may be called
-	// concurrently by multiple goroutines on the same instance.
+	// For codecs returned by this package, Count, Encode, and Decode may be
+	// called concurrently by multiple goroutines on the same instance.
 	Count(string) (int, error)
 
 	// Encode returns the token IDs and tokens for the input string.
-	// For codecs returned by this package, Encode and Count may be called
-	// concurrently by multiple goroutines on the same instance.
+	// For codecs returned by this package, Count, Encode, and Decode may be
+	// called concurrently by multiple goroutines on the same instance.
 	Encode(string) ([]uint, []string, error)
 
+	// Decode returns the text represented by the token IDs.
+	// For codecs returned by this package, Count, Encode, and Decode may be
+	// called concurrently by multiple goroutines on the same instance.
 	Decode([]uint) (string, error)
 }
 

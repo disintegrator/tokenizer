@@ -83,7 +83,7 @@ func TestP50kBase(t *testing.T) {
 	runTests(t, tok, tests)
 }
 
-func TestConcurrentCountAndEncode(t *testing.T) {
+func TestConcurrentCountEncodeDecode(t *testing.T) {
 	inputs := []string{
 		"",
 		"hello world",
@@ -119,14 +119,15 @@ func TestConcurrentCountAndEncode(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't create shared tokenizer: %v", err)
 			}
-			for worker := range 16 {
+			for worker := range 24 {
 				t.Run(fmt.Sprintf("worker-%d", worker), func(t *testing.T) {
 					t.Parallel()
 					for iteration := range 10 {
 						for offset := range inputs {
 							i := (worker + iteration + offset) % len(inputs)
 							input := inputs[i]
-							if worker%2 == 0 {
+							switch worker % 3 {
+							case 0:
 								count, err := shared.Count(input)
 								if err != nil {
 									t.Fatalf("error counting %q: %v", input, err)
@@ -134,7 +135,7 @@ func TestConcurrentCountAndEncode(t *testing.T) {
 								if count != len(wantIDs[i]) {
 									t.Fatalf("count for %q: want %d, got %d", input, len(wantIDs[i]), count)
 								}
-							} else {
+							case 1:
 								ids, tokens, err := shared.Encode(input)
 								if err != nil {
 									t.Fatalf("error encoding %q: %v", input, err)
@@ -144,6 +145,14 @@ func TestConcurrentCountAndEncode(t *testing.T) {
 								}
 								if !slices.Equal(tokens, wantTokens[i]) {
 									t.Fatalf("tokens for %q: want %q, got %q", input, wantTokens[i], tokens)
+								}
+							case 2:
+								text, err := shared.Decode(wantIDs[i])
+								if err != nil {
+									t.Fatalf("error decoding %q: %v", input, err)
+								}
+								if text != input {
+									t.Fatalf("decoded text: want %q, got %q", input, text)
 								}
 							}
 						}

@@ -3,16 +3,20 @@ package codec
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/dlclark/regexp2/v2"
 )
 
+// Codec implements token encoding and decoding.
+// A Codec must not be copied after first use.
 type Codec struct {
-	vocabulary        vocab
-	reverseVocabulary reverse
-	specialTokens     map[string]uint
-	splitRegexp       *regexp2.Regexp
-	name              string
+	vocabulary            vocab
+	reverseVocabulary     reverse
+	reverseVocabularyOnce sync.Once
+	specialTokens         map[string]uint
+	splitRegexp           *regexp2.Regexp
+	name                  string
 }
 
 func (c *Codec) GetName() string {
@@ -20,8 +24,8 @@ func (c *Codec) GetName() string {
 }
 
 // Count returns the number of tokens in the input string.
-// Count and Encode are safe to call concurrently from multiple goroutines
-// on the same Codec.
+// Count, Encode, and Decode are safe to call concurrently from multiple
+// goroutines on the same Codec.
 func (c *Codec) Count(input string) (int, error) {
 	var count int
 
@@ -33,8 +37,8 @@ func (c *Codec) Count(input string) (int, error) {
 }
 
 // Encode returns the token IDs and tokens for the input string.
-// Encode and Count are safe to call concurrently from multiple goroutines
-// on the same Codec.
+// Count, Encode, and Decode are safe to call concurrently from multiple
+// goroutines on the same Codec.
 func (c *Codec) Encode(input string) ([]uint, []string, error) {
 
 	var ids []uint
@@ -74,13 +78,16 @@ func (c *Codec) tokenize(input string, yield func(uint, string)) error {
 	return nil
 }
 
+// Decode returns the text represented by the token IDs.
+// Count, Encode, and Decode are safe to call concurrently from multiple
+// goroutines on the same Codec.
 func (c *Codec) Decode(tokens []uint) (string, error) {
-	if c.reverseVocabulary == nil {
-		c.reverseVocabulary = make(map[uint]string)
+	c.reverseVocabularyOnce.Do(func() {
+		c.reverseVocabulary = make(map[uint]string, len(c.vocabulary))
 		for k, v := range c.vocabulary {
 			c.reverseVocabulary[v] = k
 		}
-	}
+	})
 
 	var out string
 	for _, t := range tokens {
