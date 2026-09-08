@@ -24,8 +24,7 @@ func (c *Codec) GetName() string {
 }
 
 // Count returns the number of tokens in the input string.
-// Count, Encode, and Decode are safe to call concurrently from multiple
-// goroutines on the same Codec.
+// Count is safe for concurrent use by multiple goroutines on the same Codec.
 func (c *Codec) Count(input string) (int, error) {
 	var count int
 
@@ -37,8 +36,7 @@ func (c *Codec) Count(input string) (int, error) {
 }
 
 // Encode returns the token IDs and tokens for the input string.
-// Count, Encode, and Decode are safe to call concurrently from multiple
-// goroutines on the same Codec.
+// Encode is safe for concurrent use by multiple goroutines on the same Codec.
 func (c *Codec) Encode(input string) ([]uint, []string, error) {
 
 	var ids []uint
@@ -79,8 +77,7 @@ func (c *Codec) tokenize(input string, yield func(uint, string)) error {
 }
 
 // Decode returns the text represented by the token IDs.
-// Count, Encode, and Decode are safe to call concurrently from multiple
-// goroutines on the same Codec.
+// Decode is safe for concurrent use by multiple goroutines on the same Codec.
 func (c *Codec) Decode(tokens []uint) (string, error) {
 	c.reverseVocabularyOnce.Do(func() {
 		c.reverseVocabulary = make(map[uint]string, len(c.vocabulary))
